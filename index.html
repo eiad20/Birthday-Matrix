@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Birthday Matrix</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    background: black;
+    overflow: hidden;
+    height: 100%;
+    font-family: monospace;
+}
+
+canvas {
+    display: block;
+}
+
+/* Countdown overlay */
+.overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ff6fb7;
+    text-shadow:
+        0 0 10px #ff6fb7,
+        0 0 20px #ff6fb7,
+        0 0 40px #ff6fb7;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+.countdown {
+    font-size: 110px;
+    letter-spacing: 4px;
+}
+
+/* Flash */
+#flash {
+    position: fixed;
+    inset: 0;
+    background: #ff6fb7;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+
+.show {
+    opacity: 1;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="matrix"></canvas>
+<div id="countdown" class="overlay countdown"></div>
+<div id="flash"></div>
+
+<script>
+// ================== SETUP ==================
+const canvas = document.getElementById("matrix");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Matrix rain characters
+const phrase = "HAPPY BIRTHDAY";
+const letters = phrase.split("");
+
+// Rain config
+const fontSize = 26;
+const columnSpacing = 6;
+const columns = Math.floor(canvas.width / columnSpacing);
+
+const drops = Array(columns).fill(1);
+const rainChars = Array(columns).fill("");
+
+let rainSpeed = 0.18;
+let rainFade = 0.16;
+let targetRainFade = 0.16;
+
+// Countdown
+const countdownEl = document.getElementById("countdown");
+const flash = document.getElementById("flash");
+
+// ================== PARTICLE TEXT (SMALL LETTERS) ==================
+const finalMessage = "Happy birthday";
+let showParticleText = false;
+let textParticles = [];
+
+// Build big text from SMALL letters
+function buildParticleText() {
+    textParticles = [];
+
+    const offCanvas = document.createElement("canvas");
+    const offCtx = offCanvas.getContext("2d");
+
+    offCanvas.width = canvas.width;
+    offCanvas.height = canvas.height;
+
+    const bigFontSize = 140; // size of BIG text
+    offCtx.font = `bold ${bigFontSize}px monospace`;
+    offCtx.fillStyle = "#fff";
+    offCtx.textAlign = "center";
+    offCtx.textBaseline = "middle";
+    offCtx.fillText(finalMessage, offCanvas.width / 2, offCanvas.height / 2);
+
+    const img = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height).data;
+
+    for (let y = 0; y < offCanvas.height; y += 7) {
+        for (let x = 0; x < offCanvas.width; x += 7) {
+            const i = (y * offCanvas.width + x) * 4;
+            if (img[i + 3] > 150) {
+                textParticles.push({
+                    x,
+                    y,
+                    char: letters[Math.floor(Math.random() * letters.length)]
+                });
+            }
+        }
+    }
+}
+
+// Draw the particle text
+function drawParticleText() {
+    if (!showParticleText) return;
+
+    ctx.fillStyle = "#ffb3d9";
+    ctx.font = "12px monospace";
+
+    textParticles.forEach(p => {
+        // slight shimmer
+        if (Math.random() < 0.02) {
+            p.char = letters[Math.floor(Math.random() * letters.length)];
+        }
+        ctx.fillText(p.char, p.x, p.y);
+    });
+}
+
+// ================== MATRIX RAIN ==================
+function drawRain() {
+    // Fade control
+    rainFade += (targetRainFade - rainFade) * 0.05;
+
+    ctx.fillStyle = `rgba(0, 0, 0, ${rainFade})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#ff6fb7";
+    ctx.font = fontSize + "px monospace";
+
+    for (let i = 0; i < drops.length; i++) {
+        if (Math.random() < 0.05 || rainChars[i] === "") {
+            rainChars[i] = letters[Math.floor(Math.random() * letters.length)];
+        }
+
+        ctx.fillText(rainChars[i], i * columnSpacing, drops[i] * fontSize);
+
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.98) {
+            drops[i] = 0;
+        }
+
+        drops[i] += rainSpeed + Math.random() * 0.08;
+    }
+}
+
+// ================== MAIN LOOP ==================
+function loop() {
+    drawRain();
+    drawParticleText();
+    requestAnimationFrame(loop);
+}
+loop();
+
+// ================== GLITCH EFFECT ==================
+function glitchText(el, text) {
+    const chars = "!@#$%^&*<>[]{}█▓▒░";
+    let i = 0;
+    const original = el.style.transform;
+
+    const g = setInterval(() => {
+        el.textContent = text
+            .split("")
+            .map(c => Math.random() < 0.75
+                ? chars[Math.floor(Math.random() * chars.length)]
+                : c)
+            .join("");
+
+        el.style.transform =
+            `translate(-50%, -50%) translate(${(Math.random()-0.5)*12}px, ${(Math.random()-0.5)*12}px)`;
+
+        if (++i > 14) {
+            clearInterval(g);
+            el.textContent = text;
+            el.style.transform = original;
+        }
+    }, 70);
+}
+
+// ================== COUNTDOWN ==================
+let countdownValue = 5;
+const COUNTDOWN_SPEED = 1500;
+
+setTimeout(() => {
+    countdownEl.classList.add("show");
+    countdownEl.textContent = countdownValue;
+
+    const interval = setInterval(() => {
+        countdownValue--;
+
+        if (countdownValue > 1) {
+            countdownEl.textContent = countdownValue;
+
+        } else if (countdownValue === 1) {
+            countdownEl.textContent = "1";
+
+            setTimeout(() => {
+                glitchText(countdownEl, "1");
+
+                flash.style.opacity = 0.8;
+                setTimeout(() => flash.style.opacity = 0, 150);
+            }, 500);
+
+        } else {
+            clearInterval(interval);
+            countdownEl.classList.remove("show");
+
+            // FINAL EFFECTS
+            rainSpeed = 0.05;
+            targetRainFade = 0.35;
+
+            buildParticleText();
+            showParticleText = true;
+        }
+
+    }, COUNTDOWN_SPEED);
+}, 5000);
+
+// ================== RESIZE ==================
+window.onresize = () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+};
+</script>
+
+</body>
+</html>
